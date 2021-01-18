@@ -1,0 +1,84 @@
+---
+title: "Tidy Tuesday 2021: Week 3"
+subtitle: "Top Female Artists at the Tate Modern"
+description: |
+ The code and plot I created for Tidy Tuesday 1/11/2021 using data from the Tate Modern.
+author:
+  - name: Joanna Prout
+    url: 
+    affiliation: 
+    affiliation_url: 
+date: "`r Sys.Date()`"
+output: distill::distill_article
+---
+
+This week's Tidy Tuesday challenge included data from the Tate, a large art museum in the United Kingdom. Datasets related to the Tate included (1) information about artists represented and (2) information about each artwork.  Looking at others' amazing plots on twitter I noticed both mentions of the low number of female artists and graphs outlining the top artists, who were all male.  I decided to make a treemap of the most-represented female artists to get their names out there.
+
+```{r setup, include=TRUE, echo=TRUE}
+library (tidyverse)
+library (treemapify)
+library (showtext)
+
+## Loading Google fonts (https://fonts.google.com/)
+font_add_google("Montserrat")
+
+## Automatically use showtext to render text
+showtext_auto()
+
+#read in data
+artwork <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-01-12/artwork.csv')
+artists <- readr::read_csv("https://github.com/tategallery/collection/raw/master/artist_data.csv")
+```
+
+
+Learnings this week:
+
+I got the showtext package to work after an online resource pointed out that I needed to download the font to my computer AND load it in R.  Now my plots can have fancy fonts!
+
+The treemapify package was easy to work with!  Will definitely use again.
+
+
+
+
+```{r datawrangling, echo=TRUE}
+#changing artists$name to artists$artist so it is the same between files
+artists$artist <- artists$name
+
+#merging files, keep only artists born during or after the 20th century, select variables
+merged <- merge (artwork, artists, by = "artist") 
+
+#selecting female artists with the most works in Tate
+f <- merged %>%
+  filter (gender == "Female") %>%
+  select (artist, gender) %>%
+  group_by (artist) %>%
+  summarize (n = n()) %>%
+  top_n (5)
+
+#fun way to reconfigure names from https://stackoverflow.com/questions/33826650/last-name-first-name-to-first-name-last-name
+f$artist <- sapply(strsplit(f$artist, split=", "),function(x) 
+{paste(rev(x),collapse=" ")})
+
+#add label
+f$label <- paste (f$artist, f$n, sep = ", ")
+```
+
+```{r making the treemap, echo=TRUE}
+#treemap
+p <- ggplot (f, aes (area = n, fill = artist, label = label)) +
+  geom_treemap ()+
+  geom_treemap_text (color = "black", family = "Montserrat", size = 11) 
+
+q <- p + labs (title = "Most Represented Women Artists at the Tate",
+        subtitle = "\n The Tate Modern houses the UK's national collection of British Art \n in addition to modern and contemporary art from across the world.\nThis chart highlights the women with the greatest numbers of works.\n ",
+        caption ="\nSource: Tate Art Museum | Graphic: @joieprout" ) 
+
+final <- q +
+    theme(text = element_text(family = "Montserrat", size = 12), 
+    plot.title = element_text(size = 18, face = "bold"),
+    plot.caption = element_text(size = 10),
+    legend.position = "none",
+    plot.margin= unit(c(1, 1, 1, 1), units = "cm")) +
+  scale_fill_brewer(palette ="BuPu") 
+
+final    
